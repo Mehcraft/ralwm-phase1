@@ -1,0 +1,43 @@
+name: Build ralwm Phase 1 (macOS 12 x86_64)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-phase1:
+    runs-on: macos-15-intel
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode & SDK versions
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Run Step 0 + Phase 1 Patch & Build
+        run: |
+          chmod +x setup_and_build_phase1.sh
+          ./setup_and_build_phase1.sh
+
+      - name: Verify kext architecture & OSBundleLibraries (macOS 12 compatibility)
+        run: |
+          KEXT="ralwm_workspace/itlwm/build/Debug/itlwm.kext"
+          file "$KEXT/Contents/MacOS/itlwm"
+          echo "=== OSBundleLibraries ==="
+          plutil -p "$KEXT/Contents/Info.plist" | grep -A 25 OSBundleLibraries || true
+          echo "=== IOKitPersonalities.ralwm ==="
+          plutil -extract IOKitPersonalities.ralwm xml1 -o - "$KEXT/Contents/Info.plist"
+
+      - name: Package built kext
+        run: |
+          cd ralwm_workspace/itlwm/build/Debug
+          zip -r "$GITHUB_WORKSPACE/ralwm_phase1_built_kext.zip" itlwm.kext
+
+      - name: Upload ralwm Phase 1 kext artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ralwm-phase1-debug-kext
+          path: ralwm_phase1_built_kext.zip
+          retention-days: 14
